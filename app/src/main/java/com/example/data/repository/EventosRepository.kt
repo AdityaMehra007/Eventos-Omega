@@ -3,6 +3,7 @@ package com.example.data.repository
 import android.util.Log
 import com.example.data.model.*
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +18,16 @@ class EventosRepository {
       null
     }
   }
+
+  private var opportunitiesListener: ListenerRegistration? = null
+  private var reviewsListener: ListenerRegistration? = null
+  private var bookingsListener: ListenerRegistration? = null
+
+  private val _isFirestoreLive = MutableStateFlow(true)
+  val isFirestoreLive: StateFlow<Boolean> = _isFirestoreLive.asStateFlow()
+
+  private val _isSyncing = MutableStateFlow(false)
+  val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
   // Active User State
   private val _currentUser = MutableStateFlow(
@@ -183,117 +194,302 @@ class EventosRepository {
   )
   val events: StateFlow<List<EventRecord>> = _events.asStateFlow()
 
-  // Opportunities
-  private val _opportunities = MutableStateFlow(
-    listOf(
-      StaffOpportunity(
-        id = "opp_001",
-        eventId = "evt_002",
-        eventTitle = "Indiranagar Music & Food Carnival",
-        role = "Senior Crowd Supervisor",
-        areaZone = "Indiranagar",
-        date = "11 Oct 2026",
-        timeWindow = "13:30 - 23:00",
-        payRateINR = 4500,
-        grossAmountINR = 4500,
-        netAmountINR = 4275,
-        platformFeeINR = 225,
-        spotsAvailable = 4,
-        spotsFilled = 2,
-        skillsRequired = listOf("Crowd Control", "Incident Command", "Walkie-Talkie Protocol"),
-        dressCode = "All Black Formal / Eventos Armband",
-        matchScore = 96,
-        matchReasons = listOf("Verified Supervisor Badge", "5km from Koramangala base", "Previous concert experience"),
-        clientName = "Bangalore Urban Culture",
-        urgencyTag = "Immediate Confirmation"
-      ),
-      StaffOpportunity(
-        id = "opp_002",
-        eventId = "evt_002",
-        eventTitle = "Indiranagar Music & Food Carnival",
-        role = "Experiential Brand Promoter",
-        areaZone = "Indiranagar",
-        date = "11 Oct 2026",
-        timeWindow = "14:00 - 22:30",
-        payRateINR = 2200,
-        grossAmountINR = 2200,
-        netAmountINR = 2090,
-        platformFeeINR = 110,
-        spotsAvailable = 10,
-        spotsFilled = 5,
-        skillsRequired = listOf("Fluent English & Kannada", "Product Sampling", "High Energy"),
-        dressCode = "Branded T-Shirt (Provided) + Dark Jeans",
-        matchScore = 88,
-        matchReasons = listOf("Matches your language preferences", "High punctuality rating"),
-        clientName = "Bangalore Urban Culture",
-        urgencyTag = "Fast Fill"
-      ),
-      StaffOpportunity(
-        id = "opp_003",
-        eventId = "evt_001",
-        eventTitle = "Bengaluru Tech Summit 2026",
-        role = "VIP Protocol & Speaker Liaison",
-        areaZone = "Central Bengaluru",
-        date = "Today",
-        timeWindow = "08:00 - 18:00",
-        payRateINR = 3800,
-        grossAmountINR = 3800,
-        netAmountINR = 3610,
-        platformFeeINR = 190,
-        spotsAvailable = 2,
-        spotsFilled = 1,
-        skillsRequired = listOf("Executive Hospitality", "Stage Flow", "Badge Accreditation"),
-        dressCode = "Business Formal Blazer",
-        matchScore = 94,
-        matchReasons = listOf("Previous tech summit record", "Client 5-star endorsement"),
-        clientName = "Karnataka Digital Economy Mission",
-        urgencyTag = "LIVE Replacement"
-      ),
-      StaffOpportunity(
-        id = "opp_004",
-        eventId = "evt_003",
-        eventTitle = "Zepto Superfast Launch Activation",
-        role = "Lead Logistics & Inventory Marshal",
-        areaZone = "Koramangala",
-        date = "12 Oct 2026",
-        timeWindow = "10:30 - 21:00",
-        payRateINR = 3200,
-        grossAmountINR = 3200,
-        netAmountINR = 3040,
-        platformFeeINR = 160,
-        spotsAvailable = 5,
-        spotsFilled = 3,
-        skillsRequired = listOf("Stock Reconcilation", "Booth Security", "Quick Math"),
-        dressCode = "Black Polo + Cargo Pants",
-        matchScore = 91,
-        matchReasons = listOf("5 mins from Koramangala", "Verified inventory skill"),
-        clientName = "Zepto India",
-        urgencyTag = "Weekend Gig"
-      ),
-      StaffOpportunity(
-        id = "opp_005",
-        eventId = "evt_004",
-        eventTitle = "Titan Edge Luxury Showcase",
-        role = "4K Drone & Gimbal Cinematographer",
-        areaZone = "Central Bengaluru",
-        date = "18 Oct 2026",
-        timeWindow = "17:00 - 23:30",
-        payRateINR = 8500,
-        grossAmountINR = 8500,
-        netAmountINR = 8075,
-        platformFeeINR = 425,
-        spotsAvailable = 2,
-        spotsFilled = 1,
-        skillsRequired = listOf("Sony FX3 / A7SIII", "DJI Ronin", "Color Grading"),
-        dressCode = "Black Formal Suit",
-        matchScore = 98,
-        matchReasons = listOf("Cinema gear verified", "Luxury portfolio approved"),
-        clientName = "Titan Company Ltd",
-        urgencyTag = "Premium Production"
-      )
+  // Base Default Opportunities for Seeding & Fallback
+  private val defaultOpportunities = listOf(
+    StaffOpportunity(
+      id = "opp_001",
+      eventId = "evt_002",
+      eventTitle = "Indiranagar Music & Food Carnival",
+      role = "Senior Crowd Supervisor",
+      areaZone = "Indiranagar",
+      date = "11 Oct 2026",
+      timeWindow = "13:30 - 23:00",
+      payRateINR = 4500,
+      grossAmountINR = 4500,
+      netAmountINR = 4275,
+      platformFeeINR = 225,
+      spotsAvailable = 4,
+      spotsFilled = 2,
+      skillsRequired = listOf("Crowd Control", "Incident Command", "Walkie-Talkie Protocol"),
+      dressCode = "All Black Formal / Eventos Armband",
+      matchScore = 96,
+      matchReasons = listOf("Verified Supervisor Badge", "5km from Koramangala base", "Previous concert experience"),
+      clientName = "Bangalore Urban Culture",
+      urgencyTag = "Immediate Confirmation",
+      category = "Music",
+      description = "Lead crowd control and safety perimeter supervision for main outdoor music stage. Manage barricades and radio team."
+    ),
+    StaffOpportunity(
+      id = "opp_002",
+      eventId = "evt_002",
+      eventTitle = "Indiranagar Music & Food Carnival",
+      role = "Experiential Brand Promoter",
+      areaZone = "Indiranagar",
+      date = "11 Oct 2026",
+      timeWindow = "14:00 - 22:30",
+      payRateINR = 2200,
+      grossAmountINR = 2200,
+      netAmountINR = 2090,
+      platformFeeINR = 110,
+      spotsAvailable = 10,
+      spotsFilled = 5,
+      skillsRequired = listOf("Fluent English & Kannada", "Product Sampling", "High Energy"),
+      dressCode = "Branded T-Shirt (Provided) + Dark Jeans",
+      matchScore = 88,
+      matchReasons = listOf("Matches your language preferences", "High punctuality rating"),
+      clientName = "Bangalore Urban Culture",
+      urgencyTag = "Fast Fill",
+      category = "Music",
+      description = "Promote artisan food brands and drive beverage sampling interactions with festival attendees across arena stalls."
+    ),
+    StaffOpportunity(
+      id = "opp_003",
+      eventId = "evt_001",
+      eventTitle = "Bengaluru Tech Summit 2026",
+      role = "VIP Protocol & Speaker Liaison",
+      areaZone = "Central Bengaluru",
+      date = "Today",
+      timeWindow = "08:00 - 18:00",
+      payRateINR = 3800,
+      grossAmountINR = 3800,
+      netAmountINR = 3610,
+      platformFeeINR = 190,
+      spotsAvailable = 2,
+      spotsFilled = 1,
+      skillsRequired = listOf("Executive Hospitality", "Stage Flow", "Badge Accreditation"),
+      dressCode = "Business Formal Blazer",
+      matchScore = 94,
+      matchReasons = listOf("Previous tech summit record", "Client 5-star endorsement"),
+      clientName = "Karnataka Digital Economy Mission",
+      urgencyTag = "LIVE Replacement",
+      category = "Corporate",
+      description = "Escort enterprise leaders and international keynote speakers from green rooms to main auditorium stage on schedule."
+    ),
+    StaffOpportunity(
+      id = "opp_004",
+      eventId = "evt_003",
+      eventTitle = "Zepto Superfast Launch Activation",
+      role = "Lead Logistics & Inventory Marshal",
+      areaZone = "Koramangala",
+      date = "12 Oct 2026",
+      timeWindow = "10:30 - 21:00",
+      payRateINR = 3200,
+      grossAmountINR = 3200,
+      netAmountINR = 3040,
+      platformFeeINR = 160,
+      spotsAvailable = 5,
+      spotsFilled = 3,
+      skillsRequired = listOf("Stock Reconcilation", "Booth Security", "Quick Math"),
+      dressCode = "Black Polo + Cargo Pants",
+      matchScore = 91,
+      matchReasons = listOf("5 mins from Koramangala", "Verified inventory skill"),
+      clientName = "Zepto India",
+      urgencyTag = "Weekend Gig",
+      category = "Technical Support",
+      description = "Oversee delivery dispatch, manage promotional giveaways stock, and maintain accurate inventory counts at high-traffic mall booth."
+    ),
+    StaffOpportunity(
+      id = "opp_005",
+      eventId = "evt_004",
+      eventTitle = "Titan Edge Luxury Showcase",
+      role = "4K Drone & Gimbal Cinematographer",
+      areaZone = "Central Bengaluru",
+      date = "18 Oct 2026",
+      timeWindow = "17:00 - 23:30",
+      payRateINR = 8500,
+      grossAmountINR = 8500,
+      netAmountINR = 8075,
+      platformFeeINR = 425,
+      spotsAvailable = 2,
+      spotsFilled = 1,
+      skillsRequired = listOf("Sony FX3 / A7SIII", "DJI Ronin", "Color Grading"),
+      dressCode = "Black Formal Suit",
+      matchScore = 98,
+      matchReasons = listOf("Cinema gear verified", "Luxury portfolio approved"),
+      clientName = "Titan Company Ltd",
+      urgencyTag = "Premium Production",
+      category = "Weddings",
+      description = "Capture cinematic 4K video highlights, celebrity guest arrivals, and high-fashion luxury watch exhibition reels."
+    ),
+    StaffOpportunity(
+      id = "opp_006",
+      eventId = "evt_001",
+      eventTitle = "Bengaluru Tech Summit 2026",
+      role = "Stage Sound & AV Console Engineer",
+      areaZone = "Central Bengaluru",
+      date = "Today",
+      timeWindow = "07:30 - 19:30",
+      payRateINR = 4800,
+      grossAmountINR = 4800,
+      netAmountINR = 4560,
+      platformFeeINR = 240,
+      spotsAvailable = 3,
+      spotsFilled = 1,
+      skillsRequired = listOf("DiGiCo SD12", "Wireless Mic Frequency Scan", "DSP Tuning"),
+      dressCode = "Black Crew Polo",
+      matchScore = 97,
+      matchReasons = listOf("Acoustic certification verified", "Palace Grounds veteran"),
+      clientName = "Omega Eventworks Ltd",
+      urgencyTag = "Immediate",
+      category = "Technical Support",
+      description = "Operate digital mixing consoles, run RF wireless microphone scans, and ensure zero feedback during executive keynotes."
+    ),
+    StaffOpportunity(
+      id = "opp_007",
+      eventId = "evt_004",
+      eventTitle = "Royal Leela Palace Luxury Wedding",
+      role = "VIP Hospitality & Shadow Host",
+      areaZone = "Central Bengaluru",
+      date = "19 Oct 2026",
+      timeWindow = "16:00 - 23:30",
+      payRateINR = 4200,
+      grossAmountINR = 4200,
+      netAmountINR = 3990,
+      platformFeeINR = 210,
+      spotsAvailable = 6,
+      spotsFilled = 2,
+      skillsRequired = listOf("Luxury Protocol", "Multi-lingual", "Silver Service Etiquette"),
+      dressCode = "Traditional Indian Formal / Bandhgala",
+      matchScore = 93,
+      matchReasons = listOf("5-star hotel training record", "Top client rating"),
+      clientName = "Aditya Mehra Signature Events",
+      urgencyTag = "Luxury Booking",
+      category = "Weddings",
+      description = "Provide discreet personal hosting, guest reception, and bespoke banquet coordination for royal destination wedding celebration."
+    ),
+    StaffOpportunity(
+      id = "opp_008",
+      eventId = "evt_001",
+      eventTitle = "Bangalore Enterprise AI Keynote",
+      role = "Lead Executive Stage Runner",
+      areaZone = "Whitefield",
+      date = "24 Oct 2026",
+      timeWindow = "08:30 - 17:30",
+      payRateINR = 3400,
+      grossAmountINR = 3400,
+      netAmountINR = 3230,
+      platformFeeINR = 170,
+      spotsAvailable = 4,
+      spotsFilled = 1,
+      skillsRequired = listOf("Presenter Cue Management", "Teleprompter Check", "Confidentiality"),
+      dressCode = "Navy Blue Formal Suit",
+      matchScore = 92,
+      matchReasons = listOf("Enterprise clearance verified", "Near Whitefield"),
+      clientName = "Google Cloud Community Bangalore",
+      urgencyTag = "Fast Fill",
+      category = "Corporate",
+      description = "Manage backstage speaker timing cues, teleprompter status checks, and slide clicker technical readiness."
     )
   )
+
+  // Opportunities StateFlow
+  private val _opportunities = MutableStateFlow(defaultOpportunities)
   val opportunities: StateFlow<List<StaffOpportunity>> = _opportunities.asStateFlow()
+
+  // Bookings StateFlow (Stored in Firestore 'bookings' collection)
+  private val defaultBookings = listOf(
+    StaffBooking(
+      id = "bkg_001",
+      bookingReference = "EVT-BKG-8821",
+      opportunityId = "opp_001",
+      eventId = "evt_001",
+      eventTitle = "Bengaluru Tech Summit 2026",
+      role = "Lead Stage & Crowd Control Supervisor",
+      workerId = "usr_blr_001",
+      workerName = "Aditya Mehra",
+      clientName = "Karnataka IT & BT Secretariat",
+      areaZone = "Whitefield (KTPO)",
+      date = "15-17 Oct 2026",
+      timeWindow = "08:00 - 18:00",
+      payRateINR = 3500,
+      netAmountINR = 3325,
+      status = "ACTIVE_CONFIRMED",
+      escrowStatus = "ESCROW_LOCKED_100%",
+      timestamp = System.currentTimeMillis() - 86400000L
+    ),
+    StaffBooking(
+      id = "bkg_002",
+      bookingReference = "EVT-BKG-4412",
+      opportunityId = "opp_002",
+      eventId = "evt_002",
+      eventTitle = "Indiranagar Music & Food Carnival",
+      role = "Experiential Operations Director",
+      workerId = "usr_blr_001",
+      workerName = "Aditya Mehra",
+      clientName = "Bengaluru Cultural Collective",
+      areaZone = "Indiranagar 100ft Rd",
+      date = "28 Sep 2026",
+      timeWindow = "14:00 - 23:00",
+      payRateINR = 2800,
+      netAmountINR = 2660,
+      status = "COMPLETED",
+      escrowStatus = "PAYOUT_DISBURSED",
+      timestamp = System.currentTimeMillis() - (86400000L * 10)
+    ),
+    StaffBooking(
+      id = "bkg_003",
+      bookingReference = "EVT-BKG-1903",
+      opportunityId = "opp_003",
+      eventId = "evt_003",
+      eventTitle = "Zepto Corporate Annual Leadership Meet",
+      role = "Audio & 4K LED Wall Engineer",
+      workerId = "usr_blr_001",
+      workerName = "Aditya Mehra",
+      clientName = "Zepto India Leadership Team",
+      areaZone = "Koramangala 4th Block",
+      date = "20 Sep 2026",
+      timeWindow = "09:00 - 19:00",
+      payRateINR = 3200,
+      netAmountINR = 3040,
+      status = "COMPLETED",
+      escrowStatus = "PAYOUT_DISBURSED",
+      timestamp = System.currentTimeMillis() - (86400000L * 18)
+    )
+  )
+  private val _bookings = MutableStateFlow<List<StaffBooking>>(defaultBookings)
+  val bookings: StateFlow<List<StaffBooking>> = _bookings.asStateFlow()
+
+  // Reviews StateFlow (Stored in Firestore 'reviews' collection)
+  private val defaultReviews = listOf(
+    GigReview(
+      id = "rev_001",
+      gigId = "opp_001",
+      eventTitle = "Bengaluru Tech Summit 2026",
+      professionalId = "usr_blr_001",
+      professionalName = "Aditya Mehra",
+      organizerId = "org_blr_karnataka_it",
+      organizerName = "Kiran Mazumdar / Dept of Electronics & IT",
+      organizerOrganization = "Karnataka IT & BT Secretariat",
+      roleExecuted = "Lead Stage & Crowd Control Supervisor",
+      rating = 5.0f,
+      reviewText = "Exceptional leadership under high operational pressure at KTPO! Managed the main keynote stage access control for 4,500 delegates without a single security breach or schedule delay. Rigging and sound sync was flawless.",
+      punctualScore = 5.0f,
+      technicalCompetenceScore = 5.0f,
+      teamworkScore = 5.0f,
+      formattedDate = "05 Oct 2026",
+      verifiedGigBadge = true
+    ),
+    GigReview(
+      id = "rev_002",
+      gigId = "opp_002",
+      eventTitle = "Indiranagar Music & Food Carnival",
+      professionalId = "usr_blr_001",
+      professionalName = "Aditya Mehra",
+      organizerId = "org_blr_indiranagar_cul",
+      organizerName = "Vikram Shenoy",
+      organizerOrganization = "Bengaluru Cultural Collective",
+      roleExecuted = "Experiential Operations Director",
+      rating = 4.9f,
+      reviewText = "Delivered outstanding crowd ingress and sound calibration for 25+ food vendors and the live acoustic stage. Highly communicative and solved power switchovers with zero audio dropouts.",
+      punctualScore = 5.0f,
+      technicalCompetenceScore = 4.9f,
+      teamworkScore = 4.8f,
+      formattedDate = "28 Sep 2026",
+      verifiedGigBadge = true
+    )
+  )
+  private val _reviews = MutableStateFlow<List<GigReview>>(defaultReviews)
+  val reviews: StateFlow<List<GigReview>> = _reviews.asStateFlow()
 
   // Vendors
   private val _vendors = MutableStateFlow(
@@ -480,15 +676,470 @@ class EventosRepository {
   )
   val payouts: StateFlow<List<WorkerPayoutRecord>> = _payouts.asStateFlow()
 
-  // Actions
+  init {
+    initFirestoreRealtimeSync()
+  }
+
+  /**
+   * Subscribes to real-time Firestore snapshots on the "opportunities" collection.
+   * If Firestore is empty on the cloud, seeds default opportunities into Firestore.
+   */
+  fun initFirestoreRealtimeSync() {
+    val db = firestore ?: return
+    _isSyncing.value = true
+
+    try {
+      opportunitiesListener?.remove()
+      opportunitiesListener = db.collection("opportunities")
+        .addSnapshotListener { snapshot, error ->
+          _isSyncing.value = false
+          if (error != null) {
+            Log.w("EventosRepository", "Firestore snapshot listener error: ${error.message}")
+            _isFirestoreLive.value = false
+            return@addSnapshotListener
+          }
+
+          _isFirestoreLive.value = true
+          if (snapshot != null && !snapshot.isEmpty) {
+            val retrievedOpportunities = snapshot.documents.mapNotNull { doc ->
+              try {
+                StaffOpportunity(
+                  id = doc.id,
+                  eventId = doc.getString("eventId") ?: "evt_001",
+                  eventTitle = doc.getString("eventTitle") ?: "Bangalore Event",
+                  role = doc.getString("role") ?: "Event Talent",
+                  areaZone = doc.getString("areaZone") ?: "Central BLR",
+                  date = doc.getString("date") ?: "Upcoming",
+                  timeWindow = doc.getString("timeWindow") ?: "09:00 - 18:00",
+                  payRateINR = (doc.getLong("payRateINR") ?: 2500L).toInt(),
+                  grossAmountINR = (doc.getLong("grossAmountINR") ?: 2500L).toInt(),
+                  netAmountINR = (doc.getLong("netAmountINR") ?: 2375L).toInt(),
+                  platformFeeINR = (doc.getLong("platformFeeINR") ?: 125L).toInt(),
+                  spotsAvailable = (doc.getLong("spotsAvailable") ?: 5L).toInt(),
+                  spotsFilled = (doc.getLong("spotsFilled") ?: 0L).toInt(),
+                  skillsRequired = (doc.get("skillsRequired") as? List<*>)?.map { it.toString() } ?: listOf("Teamwork"),
+                  dressCode = doc.getString("dressCode") ?: "Formal",
+                  matchScore = (doc.getLong("matchScore") ?: 90L).toInt(),
+                  matchReasons = (doc.get("matchReasons") as? List<*>)?.map { it.toString() } ?: listOf("Verified Talent"),
+                  isApplied = doc.getBoolean("isApplied") ?: false,
+                  clientName = doc.getString("clientName") ?: "Client Partner",
+                  urgencyTag = doc.getString("urgencyTag") ?: "Active Gig",
+                  category = doc.getString("category") ?: "Corporate",
+                  description = doc.getString("description") ?: ""
+                )
+              } catch (e: Exception) {
+                Log.w("EventosRepository", "Error parsing opportunity doc ${doc.id}", e)
+                null
+              }
+            }
+            if (retrievedOpportunities.isNotEmpty()) {
+              _opportunities.value = retrievedOpportunities
+            }
+          } else {
+            // Seed default opportunities to Firestore so cloud database is populated
+            seedDefaultOpportunitiesToFirestore(db)
+          }
+        }
+
+      // Reviews listener on Firestore 'reviews' collection
+      reviewsListener?.remove()
+      reviewsListener = db.collection("reviews")
+        .addSnapshotListener { snapshot, error ->
+          if (error != null) {
+            Log.w("EventosRepository", "Firestore reviews snapshot listener error: ${error.message}")
+            return@addSnapshotListener
+          }
+          if (snapshot != null && !snapshot.isEmpty) {
+            val retrievedReviews = snapshot.documents.mapNotNull { doc ->
+              try {
+                GigReview(
+                  id = doc.id,
+                  gigId = doc.getString("gigId") ?: "opp_001",
+                  eventTitle = doc.getString("eventTitle") ?: "Event",
+                  professionalId = doc.getString("professionalId") ?: "usr_blr_001",
+                  professionalName = doc.getString("professionalName") ?: "Professional",
+                  organizerId = doc.getString("organizerId") ?: "org_001",
+                  organizerName = doc.getString("organizerName") ?: "Organizer",
+                  organizerOrganization = doc.getString("organizerOrganization") ?: "Event Organizers",
+                  roleExecuted = doc.getString("roleExecuted") ?: "Event Talent",
+                  rating = (doc.getDouble("rating") ?: 5.0).toFloat(),
+                  reviewText = doc.getString("reviewText") ?: "",
+                  punctualScore = (doc.getDouble("punctualScore") ?: 5.0).toFloat(),
+                  technicalCompetenceScore = (doc.getDouble("technicalCompetenceScore") ?: 5.0).toFloat(),
+                  teamworkScore = (doc.getDouble("teamworkScore") ?: 5.0).toFloat(),
+                  timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
+                  formattedDate = doc.getString("formattedDate") ?: "Oct 2026",
+                  verifiedGigBadge = doc.getBoolean("verifiedGigBadge") ?: true
+                )
+              } catch (e: Exception) {
+                Log.w("EventosRepository", "Error parsing review doc ${doc.id}", e)
+                null
+              }
+            }
+            if (retrievedReviews.isNotEmpty()) {
+              _reviews.value = retrievedReviews
+            }
+          } else {
+            seedDefaultReviewsToFirestore(db)
+          }
+        }
+
+      // Bookings listener on Firestore 'bookings' collection
+      bookingsListener?.remove()
+      bookingsListener = db.collection("bookings")
+        .addSnapshotListener { snapshot, error ->
+          if (error != null) {
+            Log.w("EventosRepository", "Firestore bookings snapshot listener error: ${error.message}")
+            return@addSnapshotListener
+          }
+          if (snapshot != null && !snapshot.isEmpty) {
+            val retrievedBookings = snapshot.documents.mapNotNull { doc ->
+              try {
+                StaffBooking(
+                  id = doc.id,
+                  bookingReference = doc.getString("bookingReference") ?: "EVT-BKG-0000",
+                  opportunityId = doc.getString("opportunityId") ?: "",
+                  eventId = doc.getString("eventId") ?: "evt_001",
+                  eventTitle = doc.getString("eventTitle") ?: "Event Gig",
+                  role = doc.getString("role") ?: "Staff Role",
+                  workerId = doc.getString("workerId") ?: "usr_blr_001",
+                  workerName = doc.getString("workerName") ?: "Aditya Mehra",
+                  clientName = doc.getString("clientName") ?: "Client Partner",
+                  areaZone = doc.getString("areaZone") ?: "Central BLR",
+                  date = doc.getString("date") ?: "Upcoming",
+                  timeWindow = doc.getString("timeWindow") ?: "09:00 - 18:00",
+                  payRateINR = (doc.getLong("payRateINR") ?: 2500L).toInt(),
+                  netAmountINR = (doc.getLong("netAmountINR") ?: 2375L).toInt(),
+                  status = doc.getString("status") ?: "ACTIVE_CONFIRMED",
+                  escrowStatus = doc.getString("escrowStatus") ?: "ESCROW_SECURED",
+                  timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                )
+              } catch (e: Exception) {
+                Log.w("EventosRepository", "Error parsing booking doc ${doc.id}", e)
+                null
+              }
+            }
+            if (retrievedBookings.isNotEmpty()) {
+              _bookings.value = retrievedBookings
+            }
+          } else {
+            seedDefaultBookingsToFirestore(db)
+          }
+        }
+    } catch (e: Exception) {
+      Log.w("EventosRepository", "Exception setting up Firestore listener: ${e.message}")
+      _isSyncing.value = false
+      _isFirestoreLive.value = false
+    }
+  }
+
+  private fun seedDefaultOpportunitiesToFirestore(db: FirebaseFirestore) {
+    try {
+      for (opp in defaultOpportunities) {
+        val map = mapOf(
+          "eventId" to opp.eventId,
+          "eventTitle" to opp.eventTitle,
+          "role" to opp.role,
+          "areaZone" to opp.areaZone,
+          "date" to opp.date,
+          "timeWindow" to opp.timeWindow,
+          "payRateINR" to opp.payRateINR,
+          "grossAmountINR" to opp.grossAmountINR,
+          "netAmountINR" to opp.netAmountINR,
+          "platformFeeINR" to opp.platformFeeINR,
+          "spotsAvailable" to opp.spotsAvailable,
+          "spotsFilled" to opp.spotsFilled,
+          "skillsRequired" to opp.skillsRequired,
+          "dressCode" to opp.dressCode,
+          "matchScore" to opp.matchScore,
+          "matchReasons" to opp.matchReasons,
+          "isApplied" to opp.isApplied,
+          "clientName" to opp.clientName,
+          "urgencyTag" to opp.urgencyTag,
+          "category" to opp.category,
+          "description" to opp.description
+        )
+        db.collection("opportunities").document(opp.id).set(map)
+      }
+      Log.d("EventosRepository", "Successfully seeded default opportunities into Firestore")
+    } catch (e: Exception) {
+      Log.w("EventosRepository", "Failed seeding opportunities to Firestore: ${e.message}")
+    }
+  }
+
+  private fun seedDefaultReviewsToFirestore(db: FirebaseFirestore) {
+    try {
+      for (rev in defaultReviews) {
+        val map = mapOf(
+          "gigId" to rev.gigId,
+          "eventTitle" to rev.eventTitle,
+          "professionalId" to rev.professionalId,
+          "professionalName" to rev.professionalName,
+          "organizerId" to rev.organizerId,
+          "organizerName" to rev.organizerName,
+          "organizerOrganization" to rev.organizerOrganization,
+          "roleExecuted" to rev.roleExecuted,
+          "rating" to rev.rating,
+          "reviewText" to rev.reviewText,
+          "punctualScore" to rev.punctualScore,
+          "technicalCompetenceScore" to rev.technicalCompetenceScore,
+          "teamworkScore" to rev.teamworkScore,
+          "timestamp" to rev.timestamp,
+          "formattedDate" to rev.formattedDate,
+          "verifiedGigBadge" to rev.verifiedGigBadge
+        )
+        db.collection("reviews").document(rev.id).set(map)
+      }
+      Log.d("EventosRepository", "Successfully seeded default reviews into Firestore 'reviews' collection")
+    } catch (e: Exception) {
+      Log.w("EventosRepository", "Failed seeding reviews to Firestore: ${e.message}")
+    }
+  }
+
+  private fun seedDefaultBookingsToFirestore(db: FirebaseFirestore) {
+    try {
+      for (bkg in defaultBookings) {
+        val map = mapOf(
+          "bookingReference" to bkg.bookingReference,
+          "opportunityId" to bkg.opportunityId,
+          "eventId" to bkg.eventId,
+          "eventTitle" to bkg.eventTitle,
+          "role" to bkg.role,
+          "workerId" to bkg.workerId,
+          "workerName" to bkg.workerName,
+          "clientName" to bkg.clientName,
+          "areaZone" to bkg.areaZone,
+          "date" to bkg.date,
+          "timeWindow" to bkg.timeWindow,
+          "payRateINR" to bkg.payRateINR,
+          "netAmountINR" to bkg.netAmountINR,
+          "status" to bkg.status,
+          "escrowStatus" to bkg.escrowStatus,
+          "timestamp" to bkg.timestamp
+        )
+        db.collection("bookings").document(bkg.id).set(map)
+      }
+      Log.d("EventosRepository", "Successfully seeded default bookings into Firestore 'bookings' collection")
+    } catch (e: Exception) {
+      Log.w("EventosRepository", "Failed seeding bookings to Firestore: ${e.message}")
+    }
+  }
+
+  /**
+   * Adds a new opportunity document directly to Firestore.
+   */
+  fun postNewGigToFirestore(opportunity: StaffOpportunity) {
+    _opportunities.update { listOf(opportunity) + it }
+    try {
+      val map = mapOf(
+        "eventId" to opportunity.eventId,
+        "eventTitle" to opportunity.eventTitle,
+        "role" to opportunity.role,
+        "areaZone" to opportunity.areaZone,
+        "date" to opportunity.date,
+        "timeWindow" to opportunity.timeWindow,
+        "payRateINR" to opportunity.payRateINR,
+        "grossAmountINR" to opportunity.grossAmountINR,
+        "netAmountINR" to opportunity.netAmountINR,
+        "platformFeeINR" to opportunity.platformFeeINR,
+        "spotsAvailable" to opportunity.spotsAvailable,
+        "spotsFilled" to opportunity.spotsFilled,
+        "skillsRequired" to opportunity.skillsRequired,
+        "dressCode" to opportunity.dressCode,
+        "matchScore" to opportunity.matchScore,
+        "matchReasons" to opportunity.matchReasons,
+        "isApplied" to opportunity.isApplied,
+        "clientName" to opportunity.clientName,
+        "urgencyTag" to opportunity.urgencyTag,
+        "category" to opportunity.category,
+        "description" to opportunity.description
+      )
+      firestore?.collection("opportunities")?.document(opportunity.id)?.set(map)
+        ?.addOnSuccessListener {
+          Log.d("EventosRepository", "New gig persisted in Firestore: ${opportunity.id}")
+        }
+    } catch (e: Exception) {
+      Log.w("EventosRepository", "Failed to write gig to Firestore: ${e.message}")
+    }
+  }
+
+  fun refreshOpportunitiesFromFirestore() {
+    initFirestoreRealtimeSync()
+  }
+
   fun applyForOpportunity(oppId: String): Boolean {
     _opportunities.update { list ->
       list.map { opp ->
         if (opp.id == oppId) opp.copy(isApplied = true, spotsFilled = opp.spotsFilled + 1) else opp
       }
     }
-    syncToFirestore("applications", oppId, mapOf("workerId" to _currentUser.value.id, "status" to "APPLIED", "timestamp" to System.currentTimeMillis()))
+    syncToFirestore("applications", "app_${System.currentTimeMillis()}", mapOf(
+      "opportunityId" to oppId,
+      "workerId" to _currentUser.value.id,
+      "workerName" to _currentUser.value.name,
+      "status" to "APPLIED",
+      "timestamp" to System.currentTimeMillis()
+    ))
+    firestore?.collection("opportunities")?.document(oppId)?.update("isApplied", true)
     return true
+  }
+
+  /**
+   * Books a gig and records the booking request in the Firestore 'bookings' collection.
+   */
+  fun bookGig(opportunity: StaffOpportunity): StaffBooking {
+    val bkgId = "bkg_${System.currentTimeMillis()}"
+    val randomSuffix = (1000..9999).random()
+    val bookingRef = "EVT-BKG-$randomSuffix"
+
+    val newBooking = StaffBooking(
+      id = bkgId,
+      bookingReference = bookingRef,
+      opportunityId = opportunity.id,
+      eventId = opportunity.eventId,
+      eventTitle = opportunity.eventTitle,
+      role = opportunity.role,
+      workerId = _currentUser.value.id,
+      workerName = _currentUser.value.name,
+      clientName = opportunity.clientName,
+      areaZone = opportunity.areaZone,
+      date = opportunity.date,
+      timeWindow = opportunity.timeWindow,
+      payRateINR = opportunity.payRateINR,
+      netAmountINR = opportunity.netAmountINR,
+      status = "CONFIRMED_BOOKED",
+      escrowStatus = "ESCROW_SECURED",
+      timestamp = System.currentTimeMillis()
+    )
+
+    _bookings.update { listOf(newBooking) + it }
+
+    // Update opportunity state to booked
+    _opportunities.update { list ->
+      list.map { opp ->
+        if (opp.id == opportunity.id) {
+          opp.copy(
+            isBooked = true,
+            isApplied = true,
+            spotsFilled = (opp.spotsFilled + 1).coerceAtMost(opp.spotsAvailable)
+          )
+        } else opp
+      }
+    }
+
+    // Persist to new 'bookings' collection in Firestore
+    val bookingData = mapOf(
+      "id" to newBooking.id,
+      "bookingReference" to newBooking.bookingReference,
+      "opportunityId" to newBooking.opportunityId,
+      "eventId" to newBooking.eventId,
+      "eventTitle" to newBooking.eventTitle,
+      "role" to newBooking.role,
+      "workerId" to newBooking.workerId,
+      "workerName" to newBooking.workerName,
+      "clientName" to newBooking.clientName,
+      "areaZone" to newBooking.areaZone,
+      "date" to newBooking.date,
+      "timeWindow" to newBooking.timeWindow,
+      "payRateINR" to newBooking.payRateINR,
+      "netAmountINR" to newBooking.netAmountINR,
+      "status" to newBooking.status,
+      "escrowStatus" to newBooking.escrowStatus,
+      "timestamp" to newBooking.timestamp
+    )
+    syncToFirestore("bookings", newBooking.id, bookingData)
+
+    return newBooking
+  }
+
+  /**
+   * Submits a rating and review from an event organizer for a professional after a gig is completed,
+   * permanently saving to Firestore 'reviews' collection and updating the professional's rating and review count.
+   */
+  fun submitReview(
+    gigId: String,
+    eventTitle: String,
+    professionalId: String,
+    professionalName: String,
+    organizerId: String,
+    organizerName: String,
+    organizerOrganization: String,
+    roleExecuted: String,
+    rating: Float,
+    reviewText: String,
+    punctualScore: Float = 5.0f,
+    technicalCompetenceScore: Float = 5.0f,
+    teamworkScore: Float = 5.0f
+  ): GigReview {
+    val reviewId = "rev_${System.currentTimeMillis()}"
+    val newReview = GigReview(
+      id = reviewId,
+      gigId = gigId,
+      eventTitle = eventTitle,
+      professionalId = professionalId,
+      professionalName = professionalName,
+      organizerId = organizerId,
+      organizerName = organizerName,
+      organizerOrganization = organizerOrganization,
+      roleExecuted = roleExecuted,
+      rating = rating,
+      reviewText = reviewText,
+      punctualScore = punctualScore,
+      technicalCompetenceScore = technicalCompetenceScore,
+      teamworkScore = teamworkScore,
+      timestamp = System.currentTimeMillis(),
+      formattedDate = "Oct 2026",
+      verifiedGigBadge = true
+    )
+
+    // Update in-memory state
+    _reviews.update { listOf(newReview) + it }
+
+    // If review is for current professional, recalculate rating and review count
+    if (professionalId == _currentUser.value.id) {
+      val allReviews = _reviews.value.filter { it.professionalId == professionalId }
+      val avgRating = if (allReviews.isNotEmpty()) {
+        allReviews.map { it.rating }.average().toFloat()
+      } else rating
+
+      val updatedUser = _currentUser.value.copy(
+        rating = (Math.round(avgRating * 100) / 100.0).toFloat(),
+        reviewCount = _currentUser.value.reviewCount + 1
+      )
+      _currentUser.value = updatedUser
+
+      // Sync updated user rating to Firestore
+      syncToFirestore("users", updatedUser.id, mapOf(
+        "rating" to updatedUser.rating,
+        "reviewCount" to updatedUser.reviewCount,
+        "updatedAt" to System.currentTimeMillis()
+      ))
+    }
+
+    // Persist to new 'reviews' collection in Firestore
+    val reviewData = mapOf(
+      "id" to newReview.id,
+      "gigId" to newReview.gigId,
+      "eventTitle" to newReview.eventTitle,
+      "professionalId" to newReview.professionalId,
+      "professionalName" to newReview.professionalName,
+      "organizerId" to newReview.organizerId,
+      "organizerName" to newReview.organizerName,
+      "organizerOrganization" to newReview.organizerOrganization,
+      "roleExecuted" to newReview.roleExecuted,
+      "rating" to newReview.rating.toDouble(),
+      "reviewText" to newReview.reviewText,
+      "punctualScore" to newReview.punctualScore.toDouble(),
+      "technicalCompetenceScore" to newReview.technicalCompetenceScore.toDouble(),
+      "teamworkScore" to newReview.teamworkScore.toDouble(),
+      "timestamp" to newReview.timestamp,
+      "formattedDate" to newReview.formattedDate,
+      "verifiedGigBadge" to newReview.verifiedGigBadge
+    )
+    syncToFirestore("reviews", newReview.id, reviewData)
+    Log.d("EventosRepository", "Review submitted and synced to Firestore 'reviews' collection: ${newReview.id}")
+
+    return newReview
   }
 
   fun checkInWorker(workerName: String, method: String = "QR Scanner"): AttendanceCheckIn {
@@ -503,7 +1154,6 @@ class EventosRepository {
       status = "Checked In"
     )
     _attendance.update { listOf(newRecord) + it }
-    // Update event checked-in count
     _events.update { list ->
       list.map { ev ->
         if (ev.id == "evt_001") ev.copy(staffCheckedIn = ev.staffCheckedIn + 1) else ev
@@ -558,6 +1208,91 @@ class EventosRepository {
         if (p.id == payoutId) p.copy(status = "DISBURSED_UPI") else p
       }
     }
+  }
+
+  /**
+   * Updates professional user profile (bio, skills, portfolio) and stores
+   * it in the 'users' collection in Cloud Firestore.
+   */
+  fun updateUserProfile(
+    bio: String,
+    skills: List<String>,
+    portfolio: List<PortfolioItem>,
+    title: String = _currentUser.value.title,
+    primaryZone: String = _currentUser.value.primaryZone,
+    hourlyRateINR: Int = _currentUser.value.hourlyRateINR
+  ): EventosUser {
+    val updatedUser = _currentUser.value.copy(
+      bio = bio,
+      skills = skills,
+      portfolio = portfolio,
+      title = title,
+      primaryZone = primaryZone,
+      hourlyRateINR = hourlyRateINR
+    )
+    _currentUser.value = updatedUser
+
+    // Save to 'users' collection in Cloud Firestore
+    val portfolioMaps = portfolio.map { item ->
+      mapOf(
+        "id" to item.id,
+        "title" to item.title,
+        "category" to item.category,
+        "eventName" to item.eventName,
+        "year" to item.year,
+        "role" to item.role,
+        "description" to item.description,
+        "mediaUrl" to item.mediaUrl,
+        "metrics" to item.metrics
+      )
+    }
+
+    val userData = mapOf(
+      "id" to updatedUser.id,
+      "eventosId" to updatedUser.eventosId,
+      "name" to updatedUser.name,
+      "email" to updatedUser.email,
+      "phone" to updatedUser.phone,
+      "role" to updatedUser.role.name,
+      "title" to updatedUser.title,
+      "bio" to updatedUser.bio,
+      "city" to updatedUser.city,
+      "primaryZone" to updatedUser.primaryZone,
+      "serviceRadiusKm" to updatedUser.serviceRadiusKm,
+      "hourlyRateINR" to updatedUser.hourlyRateINR,
+      "rating" to updatedUser.rating,
+      "reviewCount" to updatedUser.reviewCount,
+      "verifiedHours" to updatedUser.verifiedHours,
+      "completedEvents" to updatedUser.completedEvents,
+      "isVerified" to updatedUser.isVerified,
+      "skills" to updatedUser.skills,
+      "badges" to updatedUser.badges,
+      "portfolio" to portfolioMaps,
+      "avatarUrl" to updatedUser.avatarUrl,
+      "updatedAt" to System.currentTimeMillis()
+    )
+
+    syncToFirestore("users", updatedUser.id, userData)
+    Log.d("EventosRepository", "User profile permanently saved to 'users' collection in Firestore")
+    return updatedUser
+  }
+
+  fun addPortfolioItem(item: PortfolioItem) {
+    val currentPortfolio = _currentUser.value.portfolio
+    updateUserProfile(
+      bio = _currentUser.value.bio,
+      skills = _currentUser.value.skills,
+      portfolio = listOf(item) + currentPortfolio
+    )
+  }
+
+  fun removePortfolioItem(itemId: String) {
+    val updatedPortfolio = _currentUser.value.portfolio.filter { it.id != itemId }
+    updateUserProfile(
+      bio = _currentUser.value.bio,
+      skills = _currentUser.value.skills,
+      portfolio = updatedPortfolio
+    )
   }
 
   private fun syncToFirestore(collection: String, docId: String, data: Map<String, Any>) {

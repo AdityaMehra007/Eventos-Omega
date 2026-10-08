@@ -30,16 +30,20 @@ import com.example.ui.theme.*
 fun MarketplaceScreen(
   opportunities: List<StaffOpportunity>,
   onApply: (String) -> Unit,
+  onBookGig: (StaffOpportunity) -> Unit,
   modifier: Modifier = Modifier
 ) {
   var selectedZone by remember { mutableStateOf("All Bangalore") }
+  var selectedCategory by remember { mutableStateOf("All") }
   var searchQuery by remember { mutableStateOf("") }
   var selectedOppForDetails by remember { mutableStateOf<StaffOpportunity?>(null) }
 
   val zones = listOf("All Bangalore", "Koramangala", "Indiranagar", "Whitefield", "Central BLR", "HSR Layout", "Electronic City")
+  val categories = listOf("All", "Music", "Corporate", "Weddings", "Technical Support")
 
   val filteredList = opportunities.filter { opp ->
     (selectedZone == "All Bangalore" || opp.areaZone == selectedZone) &&
+      (selectedCategory == "All" || opp.category.equals(selectedCategory, ignoreCase = true)) &&
       (searchQuery.isBlank() || opp.role.contains(searchQuery, ignoreCase = true) || opp.eventTitle.contains(searchQuery, ignoreCase = true))
   }
 
@@ -105,6 +109,22 @@ fun MarketplaceScreen(
       }
     }
 
+    // Category Filter Chips
+    item {
+      LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth()
+      ) {
+        items(categories) { cat ->
+          FilterChip(
+            selected = selectedCategory == cat,
+            onClick = { selectedCategory = cat },
+            label = { Text(cat, fontSize = 12.sp) }
+          )
+        }
+      }
+    }
+
     // Results count & transparency note
     item {
       Row(
@@ -141,6 +161,7 @@ fun MarketplaceScreen(
           ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
               StatusBadge(text = "${opp.matchScore}% MATCH", color = PrimaryIndigoLight)
+              StatusBadge(text = opp.category, color = AccentCyan)
               StatusBadge(text = opp.urgencyTag, color = AccentAmber)
             }
             Column(horizontalAlignment = Alignment.End) {
@@ -268,19 +289,24 @@ fun MarketplaceScreen(
         }
       },
       confirmButton = {
-        if (!opp.isApplied) {
-          Button(
-            onClick = {
-              onApply(opp.id)
-              selectedOppForDetails = null
-            },
-            colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo)
-          ) {
-            Text("Confirm Application")
+        if (!opp.isBooked) {
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+              onClick = {
+                onBookGig(opp)
+                selectedOppForDetails = null
+              },
+              colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),
+              modifier = Modifier.testTag("marketplace_book_gig_btn")
+            ) {
+              Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+              Spacer(modifier = Modifier.width(4.dp))
+              Text("Book Gig")
+            }
           }
         } else {
-          Button(onClick = { selectedOppForDetails = null }) {
-            Text("Close")
+          Button(onClick = { selectedOppForDetails = null }, colors = ButtonDefaults.buttonColors(containerColor = EmeraldSuccess)) {
+            Text("Already Booked ✓")
           }
         }
       },

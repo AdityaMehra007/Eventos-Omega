@@ -35,6 +35,7 @@ enum class NavDestination(val label: String, val icon: ImageVector) {
   VENDORS("Vendors", Icons.Default.Storefront),
   FINANCE("Finance", Icons.Default.AccountBalanceWallet),
   PASSPORT("Passport", Icons.Default.Badge),
+  PROFILE("Profile", Icons.Default.Person),
   AI_SUITE("AI Suite", Icons.Default.AutoAwesome)
 }
 
@@ -56,6 +57,10 @@ fun EventosMainApp(
   val budgetSummary by repository.budgetSummary.collectAsStateWithLifecycle()
   val payouts by repository.payouts.collectAsStateWithLifecycle()
   val passportStamps by repository.passportStamps.collectAsStateWithLifecycle()
+  val isFirestoreLive by repository.isFirestoreLive.collectAsStateWithLifecycle()
+  val isSyncing by repository.isSyncing.collectAsStateWithLifecycle()
+  val reviews by repository.reviews.collectAsStateWithLifecycle()
+  val bookings by repository.bookings.collectAsStateWithLifecycle()
 
   var currentNav by remember { mutableStateOf(NavDestination.HOME) }
   var showRoleSwitchDialog by remember { mutableStateOf(false) }
@@ -70,7 +75,8 @@ fun EventosMainApp(
       EventosAppHeader(
         currentRole = currentUser.role,
         onRoleClick = { showRoleSwitchDialog = true },
-        onAIAssistantClick = { currentNav = NavDestination.AI_SUITE }
+        onAIAssistantClick = { currentNav = NavDestination.AI_SUITE },
+        onProfileClick = { currentNav = NavDestination.PROFILE }
       )
     },
     bottomBar = {
@@ -87,6 +93,7 @@ fun EventosMainApp(
           NavDestination.VENDORS,
           NavDestination.FINANCE,
           NavDestination.PASSPORT,
+          NavDestination.PROFILE,
           NavDestination.AI_SUITE
         )
         navItems.forEach { destination ->
@@ -130,14 +137,37 @@ fun EventosMainApp(
             user = currentUser,
             events = events,
             opportunities = opportunities,
+            isFirestoreLive = isFirestoreLive,
+            isSyncing = isSyncing,
+            onRefreshFirestore = { repository.refreshOpportunitiesFromFirestore() },
+            onPostNewGig = { newOpp -> repository.postNewGigToFirestore(newOpp) },
+            onBookGig = { opp -> repository.bookGig(opp) },
             onNavigateToControlRoom = { currentNav = NavDestination.CONTROL_ROOM },
             onNavigateToMarketplace = { currentNav = NavDestination.MARKETPLACE },
             onNavigateToWorkspace = { currentNav = NavDestination.WORKSPACE },
             onNavigateToPassport = { currentNav = NavDestination.PASSPORT },
             onNavigateToAI = { currentNav = NavDestination.AI_SUITE },
+            onNavigateToProfile = { currentNav = NavDestination.PROFILE },
             onApplyOpportunity = { oppId ->
               repository.applyForOpportunity(oppId)
               Toast.makeText(context, "Application submitted for gig! Awaiting supervisor shortlist.", Toast.LENGTH_SHORT).show()
+            },
+            onLeaveReview = { gigId, eventTitle, role, rating, text, orgName, orgOrg, punctual, tech, team ->
+              repository.submitReview(
+                gigId = gigId,
+                eventTitle = eventTitle,
+                professionalId = currentUser.id,
+                professionalName = currentUser.name,
+                organizerId = "org_client_bengaluru",
+                organizerName = orgName,
+                organizerOrganization = orgOrg,
+                roleExecuted = role,
+                rating = rating,
+                reviewText = text,
+                punctualScore = punctual,
+                technicalCompetenceScore = tech,
+                teamworkScore = team
+              )
             }
           )
         }
@@ -171,6 +201,10 @@ fun EventosMainApp(
             onApply = { oppId ->
               repository.applyForOpportunity(oppId)
               Toast.makeText(context, "1-Click Application recorded in Firestore!", Toast.LENGTH_SHORT).show()
+            },
+            onBookGig = { opp ->
+              repository.bookGig(opp)
+              Toast.makeText(context, "Gig booked! Request saved to Firestore 'bookings' collection.", Toast.LENGTH_SHORT).show()
             }
           )
         }
@@ -212,6 +246,46 @@ fun EventosMainApp(
             stamps = passportStamps,
             onUpgradeCareerWithAI = {
               currentNav = NavDestination.AI_SUITE
+            }
+          )
+        }
+        NavDestination.PROFILE -> {
+          ProfileScreen(
+            user = currentUser,
+            reviews = reviews,
+            bookings = bookings,
+            onSaveProfile = { bio, skills, portfolio, title, zone, rate ->
+              repository.updateUserProfile(
+                bio = bio,
+                skills = skills,
+                portfolio = portfolio,
+                title = title,
+                primaryZone = zone,
+                hourlyRateINR = rate
+              )
+            },
+            onAddPortfolioItem = { item ->
+              repository.addPortfolioItem(item)
+            },
+            onRemovePortfolioItem = { itemId ->
+              repository.removePortfolioItem(itemId)
+            },
+            onLeaveReview = { gigId, eventTitle, role, rating, text, orgName, orgOrg, punctual, tech, team ->
+              repository.submitReview(
+                gigId = gigId,
+                eventTitle = eventTitle,
+                professionalId = currentUser.id,
+                professionalName = currentUser.name,
+                organizerId = "org_client_bengaluru",
+                organizerName = orgName,
+                organizerOrganization = orgOrg,
+                roleExecuted = role,
+                rating = rating,
+                reviewText = text,
+                punctualScore = punctual,
+                technicalCompetenceScore = tech,
+                teamworkScore = team
+              )
             }
           )
         }

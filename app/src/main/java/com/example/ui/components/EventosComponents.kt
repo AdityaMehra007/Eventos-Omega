@@ -29,6 +29,7 @@ fun EventosAppHeader(
   currentRole: UserRole,
   onRoleClick: () -> Unit,
   onAIAssistantClick: () -> Unit,
+  onProfileClick: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   Surface(
@@ -53,7 +54,9 @@ fun EventosAppHeader(
             .clip(CircleShape)
             .background(
               Brush.linearGradient(listOf(PrimaryIndigo, AccentCyan))
-            ),
+            )
+            .clickable(onClick = onProfileClick)
+            .testTag("app_logo_profile_btn"),
           contentAlignment = Alignment.Center
         ) {
           Text(
@@ -63,7 +66,9 @@ fun EventosAppHeader(
             fontSize = 20.sp
           )
         }
-        Column {
+        Column(
+          modifier = Modifier.clickable(onClick = onProfileClick)
+        ) {
           Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
               text = "EVENTOS OMEGA",
@@ -98,6 +103,23 @@ fun EventosAppHeader(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
       ) {
+        // User Profile button
+        IconButton(
+          onClick = onProfileClick,
+          modifier = Modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(AccentCyan.copy(alpha = 0.15f))
+            .testTag("top_user_profile_btn")
+        ) {
+          Icon(
+            imageVector = Icons.Default.Person,
+            contentDescription = "User Profile & Portfolio",
+            tint = AccentCyan,
+            modifier = Modifier.size(20.dp)
+          )
+        }
+
         // AI Command quick button
         IconButton(
           onClick = onAIAssistantClick,
