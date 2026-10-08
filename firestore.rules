@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isUser(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // User profiles & Passports
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+      
+      match /passport/{docId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+    }
+
+    // Events and nested subcollections
+    match /events/{eventId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+      
+      match /{subcollection=**} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+    }
+
+    // Opportunities & Gigs in Bangalore & beyond
+    match /opportunities/{opportunityId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Applications & Bookings
+    match /applications/{applicationId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Proof of work
+    match /proof_of_work/{proofId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Attendance
+    match /attendance/{attendanceId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Vendors & Quotations
+    match /vendors/{vendorId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /quotations/{quotationId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Teams
+    match /teams/{teamId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Financial records & Invoices
+    match /invoices/{invoiceId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Reviews & Disputes
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /disputes/{disputeId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Chat / Messages
+    match /messages/{messageId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Audit logs & Intelligence
+    match /audit_logs/{logId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    // Default fallback for any other collections
+    match /{document=**} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+  }
+}

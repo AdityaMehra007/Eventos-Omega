@@ -1,0 +1,6 @@
+{
+  "name": "Eventos Omega",
+  "description": "Event Economy Operating System connecting event professionals, gigs, venues, vendors, and intelligent operations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

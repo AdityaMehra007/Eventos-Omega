@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.65"
+        android:scaleY="0.65"
+        android:translateX="18.9"
+        android:translateY="18.9">
+        <!-- Glowing Event Horizon Outer Arc -->
+        <path
+            android:fillColor="#4F46E5"
+            android:pathData="M54,12 C30.8,12 12,30.8 12,54 C12,68.2 19.1,80.7 30,88.2 L30,76.5 C23.4,70.8 19.2,62.9 19.2,54 C19.2,34.8 34.8,19.2 54,19.2 C73.2,19.2 88.8,34.8 88.8,54 C88.8,62.9 84.6,70.8 78,76.5 L78,88.2 C88.9,80.7 96,68.2 96,54 C96,30.8 77.2,12 54,12 Z" />
+        <!-- Omega Wings / Base Feet (Eventos Foundation) -->
+        <path
+            android:fillColor="#06B6D4"
+            android:pathData="M24,78 L38,78 L38,88 L20,88 C17.8,88 16,86.2 16,84 L16,78 L24,78 Z" />
+        <path
+            android:fillColor="#06B6D4"
+            android:pathData="M70,78 L84,78 L92,78 L92,84 C92,86.2 90.2,88 88,88 L70,88 L70,78 Z" />
+        <!-- Core Omega Inner Arc -->
+        <path
+            android:fillColor="#F59E0B"
+            android:pathData="M54,26 C38.5,26 26,38.5 26,54 C26,63.6 30.9,72 38.3,77 L44.8,71.5 C39.5,67.5 36,61.2 36,54 C36,44.1 44.1,36 54,36 C63.9,36 72,44.1 72,54 C72,61.2 68.5,67.5 63.2,71.5 L69.7,77 C77.1,72 82,63.6 82,54 C82,38.5 69.5,26 54,26 Z" />
+        <!-- Central Event Pulse Spark / Star -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M54,44 L56.5,51.5 L64,54 L56.5,56.5 L54,64 L51.5,56.5 L44,54 L51.5,51.5 Z" />
+        <!-- Sparkle accents -->
+        <path
+            android:fillColor="#FBBF24"
+            android:pathData="M34,34 L35.5,38.5 L40,40 L35.5,41.5 L34,46 L32.5,41.5 L28,40 L32.5,38.5 Z" />
+        <path
+            android:fillColor="#38BDF8"
+            android:pathData="M74,34 L75.5,38.5 L80,40 L75.5,41.5 L74,46 L72.5,41.5 L68,40 L72.5,38.5 Z" />
+    </group>
+</vector>
