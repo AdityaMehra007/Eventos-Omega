@@ -43,6 +43,8 @@ fun ProfileScreen(
   onAddPortfolioItem: (PortfolioItem) -> Unit,
   onRemovePortfolioItem: (String) -> Unit,
   onLeaveReview: (gigId: String, eventTitle: String, role: String, rating: Float, reviewText: String, orgName: String, orgOrg: String, punctual: Float, tech: Float, team: Float) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
+  isDarkTheme: Boolean = true,
+  onToggleTheme: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
@@ -1080,6 +1082,105 @@ fun ProfileScreen(
                 color = TextMutedDark
               )
             }
+          }
+        }
+      }
+    }
+
+    // SECTION 4: APPEARANCE & APPLICATION PREFERENCES
+    item {
+      Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+        modifier = Modifier
+          .fillMaxWidth()
+          .testTag("appearance_settings_card")
+      ) {
+        Column(
+          modifier = Modifier.padding(18.dp),
+          verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+              Icon(
+                imageVector = Icons.Default.Palette,
+                contentDescription = null,
+                tint = PrimaryIndigoLight,
+                modifier = Modifier.size(20.dp)
+              )
+              Text(
+                text = "APPEARANCE & THEME SETTINGS",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.sp,
+                color = MaterialTheme.colorScheme.onSurface
+              )
+            }
+
+            StatusBadge(
+              text = if (isDarkTheme) "Dark Active" else "Light Active",
+              color = if (isDarkTheme) AccentAmber else PrimaryIndigoLight
+            )
+          }
+
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+              Surface(
+                shape = CircleShape,
+                color = if (isDarkTheme) AccentAmber.copy(alpha = 0.15f) else PrimaryIndigo.copy(alpha = 0.15f),
+                modifier = Modifier.size(42.dp)
+              ) {
+                Box(contentAlignment = Alignment.Center) {
+                  Icon(
+                    imageVector = if (isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode,
+                    contentDescription = null,
+                    tint = if (isDarkTheme) AccentAmber else PrimaryIndigo,
+                    modifier = Modifier.size(22.dp)
+                  )
+                }
+              }
+
+              Column {
+                Text(
+                  text = if (isDarkTheme) "Executive Dark Theme" else "High-Clarity Light Theme",
+                  fontWeight = FontWeight.Bold,
+                  fontSize = 14.sp,
+                  color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                  text = if (isDarkTheme) "Low-light command center aesthetic" else "Clean, daytime sunlight readable palette",
+                  fontSize = 11.sp,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+              }
+            }
+
+            Switch(
+              checked = isDarkTheme,
+              onCheckedChange = { onToggleTheme() },
+              colors = SwitchDefaults.colors(
+                checkedThumbColor = AccentAmber,
+                checkedTrackColor = AccentAmber.copy(alpha = 0.35f),
+                uncheckedThumbColor = PrimaryIndigo,
+                uncheckedTrackColor = PrimaryIndigo.copy(alpha = 0.25f)
+              ),
+              modifier = Modifier.testTag("profile_theme_switch")
+            )
           }
         }
       }

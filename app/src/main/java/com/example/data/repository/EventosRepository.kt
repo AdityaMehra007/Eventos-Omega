@@ -8,8 +8,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
-class EventosRepository {
+import com.example.data.local.Event
+import com.example.data.local.EventDao
+
+class EventosRepository(
+  private val eventDao: EventDao? = null
+) {
   private val firestore by lazy {
     try {
       FirebaseFirestore.getInstance()
@@ -17,6 +24,17 @@ class EventosRepository {
       Log.w("EventosRepository", "Firestore init fallback: ${e.message}")
       null
     }
+  }
+
+  // Room Database Local Events Flow
+  val localEvents: Flow<List<Event>> = eventDao?.getAllEvents() ?: flowOf(emptyList())
+
+  suspend fun saveLocalEvent(event: Event) {
+    eventDao?.insertEvent(event)
+  }
+
+  suspend fun deleteLocalEvent(id: String) {
+    eventDao?.deleteEventById(id)
   }
 
   private var opportunitiesListener: ListenerRegistration? = null

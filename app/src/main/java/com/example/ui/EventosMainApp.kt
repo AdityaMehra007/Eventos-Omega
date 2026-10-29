@@ -27,8 +27,12 @@ import com.example.ui.screens.*
 import com.example.ui.theme.DarkSurfaceElevated
 import com.example.ui.theme.PrimaryIndigoLight
 
+import com.example.ui.viewmodel.EventViewModel
+
 enum class NavDestination(val label: String, val icon: ImageVector) {
   HOME("Home", Icons.Default.Dashboard),
+  EVENTS_DB("Events", Icons.Default.Event),
+  EVENT_STATS("Stats", Icons.Default.PieChart),
   CONTROL_ROOM("Command", Icons.Default.Sensors),
   MARKETPLACE("Gigs", Icons.Default.WorkOutline),
   WORKSPACE("Workspace", Icons.Default.Assignment),
@@ -42,7 +46,10 @@ enum class NavDestination(val label: String, val icon: ImageVector) {
 @Composable
 fun EventosMainApp(
   repository: EventosRepository,
+  eventViewModel: EventViewModel? = null,
   geminiService: GeminiService,
+  isDarkTheme: Boolean = true,
+  onToggleTheme: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
@@ -76,7 +83,9 @@ fun EventosMainApp(
         currentRole = currentUser.role,
         onRoleClick = { showRoleSwitchDialog = true },
         onAIAssistantClick = { currentNav = NavDestination.AI_SUITE },
-        onProfileClick = { currentNav = NavDestination.PROFILE }
+        onProfileClick = { currentNav = NavDestination.PROFILE },
+        isDarkTheme = isDarkTheme,
+        onToggleTheme = onToggleTheme
       )
     },
     bottomBar = {
@@ -87,6 +96,7 @@ fun EventosMainApp(
       ) {
         val navItems = listOf(
           NavDestination.HOME,
+          NavDestination.EVENTS_DB,
           NavDestination.CONTROL_ROOM,
           NavDestination.MARKETPLACE,
           NavDestination.WORKSPACE,
@@ -148,6 +158,7 @@ fun EventosMainApp(
             onNavigateToPassport = { currentNav = NavDestination.PASSPORT },
             onNavigateToAI = { currentNav = NavDestination.AI_SUITE },
             onNavigateToProfile = { currentNav = NavDestination.PROFILE },
+            onNavigateToEvents = { currentNav = NavDestination.EVENTS_DB },
             onApplyOpportunity = { oppId ->
               repository.applyForOpportunity(oppId)
               Toast.makeText(context, "Application submitted for gig! Awaiting supervisor shortlist.", Toast.LENGTH_SHORT).show()
@@ -170,6 +181,28 @@ fun EventosMainApp(
               )
             }
           )
+        }
+        NavDestination.EVENTS_DB -> {
+          if (eventViewModel != null) {
+            EventListScreen(
+              viewModel = eventViewModel,
+              isDarkTheme = isDarkTheme,
+              onToggleTheme = onToggleTheme,
+              onNavigateToStats = { currentNav = NavDestination.EVENT_STATS }
+            )
+          }
+        }
+        NavDestination.EVENT_STATS -> {
+          if (eventViewModel != null) {
+            EventStatisticsScreen(
+              viewModel = eventViewModel,
+              onNavigateBack = { currentNav = NavDestination.EVENTS_DB },
+              onFilterByStatus = { status ->
+                eventViewModel.setFilterStatus(status)
+                currentNav = NavDestination.EVENTS_DB
+              }
+            )
+          }
         }
         NavDestination.CONTROL_ROOM -> {
           val liveEvent = events.firstOrNull { it.status == com.example.data.model.EventStatus.LIVE } ?: events.first()
@@ -286,7 +319,9 @@ fun EventosMainApp(
                 technicalCompetenceScore = tech,
                 teamworkScore = team
               )
-            }
+            },
+            isDarkTheme = isDarkTheme,
+            onToggleTheme = onToggleTheme
           )
         }
         NavDestination.AI_SUITE -> {

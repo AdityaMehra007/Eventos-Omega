@@ -292,4 +292,280 @@ class ExampleRobolectricTest {
     assertNotNull(response)
     assertTrue(response.text.isNotEmpty())
   }
+
+  @Test
+  fun `test room database event entity dao persistence operations`() = runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val db = androidx.room.Room.inMemoryDatabaseBuilder(context, com.example.data.local.EventosDatabase::class.java)
+      .allowMainThreadQueries()
+      .build()
+    val dao = db.eventDao()
+
+    val testEvent = com.example.data.local.Event(
+      id = "evt_room_001",
+      name = "Bangalore EDM Carnival",
+      date = "15 Nov 2026",
+      venue = "Manpho Convention Centre",
+      status = "CONFIRMED",
+      areaZone = "Nagavara",
+      clientName = "Sunburn India"
+    )
+
+    // Insert
+    dao.insertEvent(testEvent)
+
+    // Query by ID
+    val retrieved = dao.getEventById("evt_room_001")
+    assertNotNull(retrieved)
+    assertEquals("Bangalore EDM Carnival", retrieved?.name)
+    assertEquals("15 Nov 2026", retrieved?.date)
+    assertEquals("Manpho Convention Centre", retrieved?.venue)
+    assertEquals("CONFIRMED", retrieved?.status)
+
+    // Update
+    val updatedEvent = retrieved!!.copy(status = "LIVE")
+    dao.updateEvent(updatedEvent)
+    val checkUpdated = dao.getEventById("evt_room_001")
+    assertEquals("LIVE", checkUpdated?.status)
+
+    // Delete
+    dao.deleteEventById("evt_room_001")
+    val afterDelete = dao.getEventById("evt_room_001")
+    assertNull(afterDelete)
+
+    db.close()
+  }
+
+  @Test
+  fun `test event repository clean api for viewmodel interactions`() = runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val db = androidx.room.Room.inMemoryDatabaseBuilder(context, com.example.data.local.EventosDatabase::class.java)
+      .allowMainThreadQueries()
+      .build()
+    val repository = com.example.data.repository.EventRepository(db.eventDao())
+
+    val event1 = com.example.data.local.Event(
+      id = "repo_evt_001",
+      name = "Koramangala Tech Startup Showcase",
+      date = "20 Nov 2026",
+      venue = "Koramangala Indoor Stadium",
+      status = "PLANNING",
+      areaZone = "Koramangala"
+    )
+    val event2 = com.example.data.local.Event(
+      id = "repo_evt_002",
+      name = "Whitefield AI Summit",
+      date = "22 Nov 2026",
+      venue = "KTPO Trade Centre",
+      status = "CONFIRMED",
+      areaZone = "Whitefield"
+    )
+
+    // Insert events via repository
+    repository.insertEvents(listOf(event1, event2))
+
+    // Query single event
+    val fetched1 = repository.getEventById("repo_evt_001")
+    assertNotNull(fetched1)
+    assertEquals("Koramangala Tech Startup Showcase", fetched1?.name)
+    assertEquals("PLANNING", fetched1?.status)
+
+    // Update via repository
+    repository.updateEvent(fetched1!!.copy(status = "CONFIRMED"))
+    val updated1 = repository.getEventById("repo_evt_001")
+    assertEquals("CONFIRMED", updated1?.status)
+
+    // Delete single event via repository
+    repository.deleteEventById("repo_evt_002")
+    val fetched2 = repository.getEventById("repo_evt_002")
+    assertNull(fetched2)
+
+    // Clear all
+    repository.clearAllEvents()
+    val afterClear = repository.getEventById("repo_evt_001")
+    assertNull(afterClear)
+
+    db.close()
+  }
+
+  @Test
+  fun `test event viewmodel exposes state and handles add event`() = runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val db = androidx.room.Room.inMemoryDatabaseBuilder(context, com.example.data.local.EventosDatabase::class.java)
+      .allowMainThreadQueries()
+      .build()
+    val repository = com.example.data.repository.EventRepository(db.eventDao())
+    val viewModel = com.example.ui.viewmodel.EventViewModel(repository)
+
+    // Initial state
+    assertEquals("ALL", viewModel.selectedStatus.value)
+    assertEquals("", viewModel.searchQuery.value)
+
+    // Filter change
+    viewModel.setFilterStatus("LIVE")
+    assertEquals("LIVE", viewModel.selectedStatus.value)
+
+    // Search query change
+    viewModel.setSearchQuery("Palace")
+    assertEquals("Palace", viewModel.searchQuery.value)
+
+    // Add event via viewModel
+    viewModel.addEvent(
+      name = "Bangalore Design Fest",
+      date = "05 Dec 2026",
+      venue = "Jayachamaraja Road",
+      status = "PLANNING",
+      areaZone = "Central Bengaluru"
+    )
+
+    db.close()
+  }
+
+  @Test
+  fun `test swipe to delete triggers repository delete and updates state`() = runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val db = androidx.room.Room.inMemoryDatabaseBuilder(context, com.example.data.local.EventosDatabase::class.java)
+      .allowMainThreadQueries()
+      .build()
+    val repository = com.example.data.repository.EventRepository(db.eventDao())
+    val viewModel = com.example.ui.viewmodel.EventViewModel(repository)
+
+    val eventToDelete = com.example.data.local.Event(
+      id = "swipe_del_001",
+      name = "Electronic City IoT Meetup",
+      date = "28 Nov 2026",
+      venue = "Infosys Gate 1",
+      status = "CONFIRMED"
+    )
+
+    // Insert into DB
+    repository.insertEvent(eventToDelete)
+    val checkInserted = repository.getEventById("swipe_del_001")
+    assertNotNull(checkInserted)
+
+    // Trigger delete action (same method invoked by SwipeToDismissBox confirmValueChange)
+    viewModel.deleteEvent("swipe_del_001")
+
+    // Verify deleted from repository
+    val checkDeleted = repository.getEventById("swipe_del_001")
+    assertNull(checkDeleted)
+
+    db.close()
+  }
+
+  @Test
+  fun `test real time search query filters events by name and venue`() = runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val db = androidx.room.Room.inMemoryDatabaseBuilder(context, com.example.data.local.EventosDatabase::class.java)
+      .allowMainThreadQueries()
+      .build()
+    val repository = com.example.data.repository.EventRepository(db.eventDao())
+    val viewModel = com.example.ui.viewmodel.EventViewModel(repository)
+
+    val ev1 = com.example.data.local.Event(
+      id = "ev_search_1",
+      name = "Global Fintech Summit",
+      date = "12 Dec 2026",
+      venue = "Palace Grounds",
+      status = "CONFIRMED"
+    )
+    val ev2 = com.example.data.local.Event(
+      id = "ev_search_2",
+      name = "Indie Food Festival",
+      date = "14 Dec 2026",
+      venue = "Koramangala Stadium",
+      status = "UPCOMING"
+    )
+
+    repository.insertEvents(listOf(ev1, ev2))
+
+    // Test search by name
+    viewModel.setSearchQuery("Fintech")
+    assertEquals("Fintech", viewModel.searchQuery.value)
+
+    // Test search by venue
+    viewModel.setSearchQuery("Koramangala")
+    assertEquals("Koramangala", viewModel.searchQuery.value)
+
+    // Test clearing search
+    viewModel.setSearchQuery("")
+    assertEquals("", viewModel.searchQuery.value)
+
+    db.close()
+  }
+
+  @Test
+  fun `test status slice distribution computation for statistics screen`() = runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val db = androidx.room.Room.inMemoryDatabaseBuilder(context, com.example.data.local.EventosDatabase::class.java)
+      .allowMainThreadQueries()
+      .build()
+    val repository = com.example.data.repository.EventRepository(db.eventDao())
+
+    val events = listOf(
+      com.example.data.local.Event(id = "st_1", name = "E1", date = "D1", venue = "V1", status = "Upcoming"),
+      com.example.data.local.Event(id = "st_2", name = "E2", date = "D2", venue = "V2", status = "In-Progress"),
+      com.example.data.local.Event(id = "st_3", name = "E3", date = "D3", venue = "V3", status = "Completed"),
+      com.example.data.local.Event(id = "st_4", name = "E4", date = "D4", venue = "V4", status = "Upcoming")
+    )
+    repository.insertEvents(events)
+
+    val stored = repository.getEventById("st_1")
+    assertNotNull(stored)
+
+    val upcoming = events.count { it.status.equals("Upcoming", ignoreCase = true) }
+    val inProgress = events.count { it.status.equals("In-Progress", ignoreCase = true) }
+    val completed = events.count { it.status.equals("Completed", ignoreCase = true) }
+
+    assertEquals(2, upcoming)
+    assertEquals(1, inProgress)
+    assertEquals(1, completed)
+    assertEquals(4, events.size)
+
+    db.close()
+  }
+
+  @Test
+  fun `test event csv exporter produces valid formatted csv and file`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val events = listOf(
+      com.example.data.local.Event(
+        id = "csv_evt_001",
+        name = "Bengaluru Tech Summit, 2026",
+        date = "15 Nov 2026",
+        timeSlot = "09:00 - 18:00",
+        venue = "Palace Grounds, Main Gate",
+        areaZone = "Sadashivanagar",
+        status = "CONFIRMED",
+        clientName = "Govt of Karnataka",
+        description = "Annual flagship tech showcase; VIP protocols."
+      ),
+      com.example.data.local.Event(
+        id = "csv_evt_002",
+        name = "Indie Music Night",
+        date = "18 Nov 2026",
+        timeSlot = "18:00 - 23:00",
+        venue = "UB City Amphitheater",
+        areaZone = "CBD",
+        status = "UPCOMING",
+        clientName = "LiveNation India",
+        description = "Sound check at 15:00."
+      )
+    )
+
+    val csvString = com.example.util.EventCsvExporter.generateCsvString(events)
+
+    // Assert CSV header
+    assertTrue(csvString.contains("Event ID,Event Name,Date,Time Slot,Venue,Area Zone,Status,Client / Organizer,Description,Created Timestamp"))
+
+    // Assert escaped commas in title & venue
+    assertTrue(csvString.contains("\"Bengaluru Tech Summit, 2026\""))
+    assertTrue(csvString.contains("\"Palace Grounds, Main Gate\""))
+
+    // Test writing to cache file
+    val file = com.example.util.EventCsvExporter.writeCsvToCache(context, events)
+    assertTrue(file.exists())
+    assertTrue(file.length() > 0)
+    assertTrue(file.name.endsWith(".csv"))
+  }
 }

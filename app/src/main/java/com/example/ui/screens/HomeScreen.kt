@@ -53,6 +53,7 @@ fun HomeScreen(
   onNavigateToPassport: () -> Unit,
   onNavigateToAI: () -> Unit,
   onNavigateToProfile: () -> Unit = {},
+  onNavigateToEvents: () -> Unit = {},
   onApplyOpportunity: (String) -> Unit,
   onLeaveReview: (gigId: String, eventTitle: String, role: String, rating: Float, reviewText: String, orgName: String, orgOrg: String, punctual: Float, tech: Float, team: Float) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
   modifier: Modifier = Modifier
@@ -403,6 +404,14 @@ fun HomeScreen(
           color = EmeraldSuccess,
           onClick = onNavigateToProfile,
           modifier = Modifier.weight(1f).testTag("quick_profile_btn")
+        )
+        QuickToolCard(
+          title = "Events DB",
+          desc = "Room SQLite",
+          icon = Icons.Default.Event,
+          color = PrimaryIndigoLight,
+          onClick = onNavigateToEvents,
+          modifier = Modifier.weight(1f).testTag("quick_events_db_btn")
         )
         QuickToolCard(
           title = "Marketplace",

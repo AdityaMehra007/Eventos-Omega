@@ -30,6 +30,8 @@ fun EventosAppHeader(
   onRoleClick: () -> Unit,
   onAIAssistantClick: () -> Unit,
   onProfileClick: () -> Unit = {},
+  isDarkTheme: Boolean = true,
+  onToggleTheme: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   Surface(
@@ -133,6 +135,23 @@ fun EventosAppHeader(
             imageVector = Icons.Default.AutoAwesome,
             contentDescription = "AI Command Suite",
             tint = PrimaryIndigoLight,
+            modifier = Modifier.size(20.dp)
+          )
+        }
+
+        // Light/Dark Mode Theme Toggle Button
+        IconButton(
+          onClick = onToggleTheme,
+          modifier = Modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(if (isDarkTheme) AccentAmber.copy(alpha = 0.15f) else PrimaryIndigo.copy(alpha = 0.15f))
+            .testTag("theme_toggle_btn")
+        ) {
+          Icon(
+            imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+            contentDescription = if (isDarkTheme) "Switch to Light Mode" else "Switch to Dark Mode",
+            tint = if (isDarkTheme) AccentAmber else PrimaryIndigo,
             modifier = Modifier.size(20.dp)
           )
         }
